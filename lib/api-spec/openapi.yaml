@@ -1,0 +1,1087 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Shop Circle API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: services
+    description: Service listings
+  - name: bookings
+    description: Booking management
+  - name: users
+    description: User management
+  - name: vendors
+    description: Vendor management
+  - name: admin
+    description: Admin operations
+  - name: payments
+    description: Payment operations
+  - name: dashboard
+    description: Dashboard data
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user or vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # Services
+  /services:
+    get:
+      operationId: listServices
+      tags: [services]
+      summary: List all approved services
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [rental, stay, shopping]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: List of services
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceListResponse"
+
+    post:
+      operationId: createService
+      tags: [services]
+      summary: Create a new service listing (Vendor only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceBody"
+      responses:
+        "201":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /services/featured:
+    get:
+      operationId: listFeaturedServices
+      tags: [services]
+      summary: Get featured services (top rated, most booked)
+      responses:
+        "200":
+          description: Featured services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+
+  /services/{serviceId}:
+    get:
+      operationId: getService
+      tags: [services]
+      summary: Get service details
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateService
+      tags: [services]
+      summary: Update a service (Vendor or Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceBody"
+      responses:
+        "200":
+          description: Updated service
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+    delete:
+      operationId: deleteService
+      tags: [services]
+      summary: Delete a service
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # Bookings
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings (user's own, or vendor's, or all for admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, completed, cancelled, rejected]
+      responses:
+        "200":
+          description: Bookings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking (User only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{bookingId}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get booking details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{bookingId}/status:
+    put:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Update booking status (vendor accepts/rejects, or moves to completed)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingStatusBody"
+      responses:
+        "200":
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  # Payments
+  /payments/initiate:
+    post:
+      operationId: initiatePayment
+      tags: [payments]
+      summary: Initiate payment for a booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiatePaymentBody"
+      responses:
+        "200":
+          description: Payment session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSession"
+
+  /payments/confirm:
+    post:
+      operationId: confirmPayment
+      tags: [payments]
+      summary: Confirm/simulate payment success
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPaymentBody"
+      responses:
+        "200":
+          description: Payment confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List payments (admin or own)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Payments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+
+  # Vendor routes
+  /vendor/services:
+    get:
+      operationId: listVendorServices
+      tags: [vendors]
+      summary: List vendor's own services
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Vendor services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+
+  /vendor/bookings:
+    get:
+      operationId: listVendorBookings
+      tags: [vendors]
+      summary: List all bookings for vendor's services
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Vendor bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+  /vendor/dashboard:
+    get:
+      operationId: getVendorDashboard
+      tags: [vendors]
+      summary: Get vendor dashboard stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Vendor stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDashboard"
+
+  # Admin routes
+  /admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [admin]
+      summary: Get admin dashboard stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: List all users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /admin/users/{userId}:
+    put:
+      operationId: updateUser
+      tags: [admin]
+      summary: Update user (activate/deactivate)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+    delete:
+      operationId: deleteUser
+      tags: [admin]
+      summary: Delete a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /admin/services:
+    get:
+      operationId: listAdminServices
+      tags: [admin]
+      summary: List all services for admin (including pending)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+
+  /admin/services/{serviceId}/approve:
+    put:
+      operationId: approveService
+      tags: [admin]
+      summary: Approve or reject a service listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveServiceBody"
+      responses:
+        "200":
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /admin/transactions:
+    get:
+      operationId: listTransactions
+      tags: [admin]
+      summary: List all transactions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    RegisterBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [user, vendor]
+          default: user
+        businessName:
+          type: string
+      required:
+        - name
+        - email
+        - password
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, vendor, admin]
+        businessName:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - role
+        - isActive
+        - createdAt
+
+    UpdateUserBody:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+        name:
+          type: string
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [rental, stay, shopping]
+        price:
+          type: number
+        priceUnit:
+          type: string
+          enum: [per_day, per_night, per_item, per_hour]
+        imageUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        rating:
+          type: number
+          nullable: true
+        reviewCount:
+          type: integer
+        bookingCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - description
+        - category
+        - price
+        - priceUnit
+        - location
+        - status
+        - vendorId
+        - vendorName
+        - reviewCount
+        - bookingCount
+        - createdAt
+
+    CreateServiceBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [rental, stay, shopping]
+        price:
+          type: number
+        priceUnit:
+          type: string
+          enum: [per_day, per_night, per_item, per_hour]
+        imageUrl:
+          type: string
+        location:
+          type: string
+      required:
+        - title
+        - description
+        - category
+        - price
+        - priceUnit
+        - location
+
+    UpdateServiceBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [rental, stay, shopping]
+        price:
+          type: number
+        priceUnit:
+          type: string
+          enum: [per_day, per_night, per_item, per_hour]
+        imageUrl:
+          type: string
+        location:
+          type: string
+
+    ServiceListResponse:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - services
+        - total
+        - page
+        - limit
+        - totalPages
+
+    ApproveServiceBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        rejectionReason:
+          type: string
+      required:
+        - status
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        serviceCategory:
+          type: string
+        serviceImageUrl:
+          type: string
+          nullable: true
+        userId:
+          type: string
+        userName:
+          type: string
+        userEmail:
+          type: string
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        quantity:
+          type: integer
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled, rejected]
+        paymentStatus:
+          type: string
+          enum: [unpaid, paid, refunded]
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - serviceId
+        - serviceName
+        - serviceCategory
+        - userId
+        - userName
+        - userEmail
+        - vendorId
+        - vendorName
+        - startDate
+        - endDate
+        - quantity
+        - totalAmount
+        - status
+        - paymentStatus
+        - createdAt
+
+    CreateBookingBody:
+      type: object
+      properties:
+        serviceId:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        notes:
+          type: string
+      required:
+        - serviceId
+        - startDate
+        - endDate
+
+    UpdateBookingStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [confirmed, completed, cancelled, rejected]
+      required:
+        - status
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        bookingId:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        paymentMethod:
+          type: string
+        transactionId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - bookingId
+        - userId
+        - userName
+        - amount
+        - currency
+        - status
+        - paymentMethod
+        - createdAt
+
+    InitiatePaymentBody:
+      type: object
+      properties:
+        bookingId:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [card, upi, netbanking, wallet]
+          default: card
+      required:
+        - bookingId
+
+    ConfirmPaymentBody:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        transactionId:
+          type: string
+      required:
+        - paymentId
+
+    PaymentSession:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        bookingId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+        mockClientSecret:
+          type: string
+      required:
+        - paymentId
+        - bookingId
+        - amount
+        - currency
+        - status
+        - mockClientSecret
+
+    VendorDashboard:
+      type: object
+      properties:
+        totalServices:
+          type: integer
+        activeServices:
+          type: integer
+        totalBookings:
+          type: integer
+        pendingBookings:
+          type: integer
+        confirmedBookings:
+          type: integer
+        completedBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        monthlyRevenue:
+          type: number
+        recentBookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+      required:
+        - totalServices
+        - activeServices
+        - totalBookings
+        - pendingBookings
+        - confirmedBookings
+        - completedBookings
+        - totalRevenue
+        - monthlyRevenue
+        - recentBookings
+
+    AdminDashboard:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalVendors:
+          type: integer
+        totalServices:
+          type: integer
+        pendingServices:
+          type: integer
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        monthlyRevenue:
+          type: number
+        bookingsByCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              count:
+                type: integer
+            required:
+              - category
+              - count
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+      required:
+        - totalUsers
+        - totalVendors
+        - totalServices
+        - pendingServices
+        - totalBookings
+        - totalRevenue
+        - monthlyRevenue
+        - bookingsByCategory
+        - recentTransactions
